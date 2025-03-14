@@ -1,5 +1,5 @@
 PODS:
-  - SwiftyJSON (2.3.2)
+  - SwiftyJSON (5.0.0)
 
 DEPENDENCIES:
   - SwiftyJSON (from `https://github.com/SwiftyJSON/SwiftyJSON.git`)
@@ -10,10 +10,12 @@ EXTERNAL SOURCES:
 
 CHECKOUT OPTIONS:
   SwiftyJSON:
-    :commit: 2a5b70f06001316d4fb54501edc70b4084705da0
+    :commit: cbf2d4955557abc1ed5debab21d20763e7ebc540
     :git: https://github.com/SwiftyJSON/SwiftyJSON.git
 
 SPEC CHECKSUMS:
-  SwiftyJSON: 04ccea08915aa0109039157c7974cf0298da292a
+  SwiftyJSON: f0574c07d8ca1644050db687067209e3033a89a0
 
-COCOAPODS: 0.39.0
+PODFILE CHECKSUM: 8cc6e24f80d76ca3b1348860ce1f6fc057da5df4
+
+COCOAPODS: 1.9.3

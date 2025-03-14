@@ -25,13 +25,13 @@ class SettingItem {
 
 extension SettingItem {
 
-    func export() -> [String: AnyObject] {
-        var data: [String: AnyObject] = [
+    func export() -> [String: Any] {
+        var data: [String: Any] = [
             "name": self.name!,
             "servers": self.servers!
         ]
         if let loadCmd = self.loadCmd {
-            data["load_cmd"] = loadCmd
+            data["load_cmd"] = loadCmd as AnyObject
         }
         return data
     }

@@ -16,29 +16,29 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @IBOutlet weak var versionItem: NSMenuItem!
     @IBOutlet weak var interfaceMenu: NSMenu!
 
-    let statusItem = NSStatusBar.systemStatusBar().statusItemWithLength(-1)
-    let configFilePath = NSHomeDirectory().stringByAppendingString("/.dnsswitcher.json")
+    let statusItem = NSStatusBar.system.statusItem(withLength: -1)
+    let configFilePath = (NSHomeDirectory() as NSString).appending("/.dnsswitcher.json")
 
     var config: Config?
     var lastConfigFileUpdate: NSDate?
 
     // MARK: - Application lifecycle
 
-    func applicationDidFinishLaunching(aNotification: NSNotification) {
+    func applicationDidFinishLaunching(_ aNotification: Notification) {
 
         // Add status bar icon
-        let menuIcon = NSImage(named: "MenuIcon")
-        menuIcon?.template = true
-        statusItem.image = menuIcon
+        if let button = statusItem.button {
+            button.image = NSImage(named: NSImage.Name("MenuIcon"))
+        }
         statusItem.menu = menu
 
         // Set version number
-        if let version = NSBundle.mainBundle().infoDictionary!["CFBundleShortVersionString"] as? String {
+        if let version = Bundle.main.infoDictionary!["CFBundleShortVersionString"] as? String {
             self.versionItem.title = "v\(version)"
         }
 
         // Create default configuration file if required
-        if !NSFileManager.defaultManager().fileExistsAtPath(self.configFilePath) {
+        if !FileManager.default.fileExists(atPath: self.configFilePath) {
             self.createDefaultConfigFile()
         }
 
@@ -57,41 +57,41 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func loadNetworkInterfaces() {
         let command: [String] = [ "networksetup", "-listallnetworkservices" ]
-        let (result, output) = runCommand(command)
+        let (result, output) = runCommand(args: command)
         if result != 0 {
             print("Critical error: could not load network services")
             self.quit(nil)
             return
         }
-        for interface in output.componentsSeparatedByString("\n") {
+        for interface in (output as NSString).components(separatedBy: "\n") {
             // Ignore disabled interfaces
-            if interface.containsString("*") || interface == "" {
+            if (interface as NSString).contains("*") || interface == "" {
                 continue
             }
             // Add the network interface to the interfaces menu
-            let interfaceItem = NSMenuItem(title: interface, action: #selector(AppDelegate.setInterface(_:)), keyEquivalent: "")
+            let interfaceItem = NSMenuItem(title: interface, action: #selector(self.setInterface(_:)), keyEquivalent: "")
             self.interfaceMenu.addItem(interfaceItem)
         }
     }
 
     func highlightEnabledInterface() {
         var interfaceSelected = false
-        for item in self.interfaceMenu.itemArray {
-            item.state = 0
+        for item in self.interfaceMenu.items {
+            item.state = NSControl.StateValue(rawValue: 0)
             if item.title == self.config?.interface {
-                item.state = 1
+                item.state = NSControl.StateValue(rawValue: 1)
                 interfaceSelected = true
             }
         }
         /* Failover - if no interface has been selected, set
          * the first one */
         if !interfaceSelected {
-            self.config?.interface = self.interfaceMenu.itemArray[0].title
-            self.interfaceMenu.itemArray[0].state = 1
+            self.config?.interface = self.interfaceMenu.items[0].title
+            self.interfaceMenu.items[0].state = NSControl.StateValue(rawValue: 1)
         }
     }
 
-    func setInterface(item: NSMenuItem) {
+    @objc func setInterface(_ item: NSMenuItem) {
         self.config?.interface = item.title
         self.highlightEnabledInterface()
         self.saveLatestConfig()
@@ -101,7 +101,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: - DNS settings
 
     func clearServers() {
-        for item in self.menu.itemArray {
+        for item in self.menu.items {
             if item is DNSMenuItem {
                 self.menu.removeItem(item)
             }
@@ -110,49 +110,49 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func highlightCurrentDNSServers() {
         let command: [String] = [ "networksetup", "-getdnsservers", self.config!.interface! ]
-        let (result, output) = self.runCommand(command)
+        let (result, output) = self.runCommand(args: command)
         if result != 0 {
             print("Error fetching current DNS servers")
             return
         }
         var servers: [String] = []
-        for s in output.componentsSeparatedByString("\n") {
+        for s in (output as NSString).components(separatedBy: "\n") {
             if s != "" {
                 servers.append(s)
             }
         }
 
         // Highlight the selected DNS servers in the menu
-        for item in self.menu.itemArray {
+        for item in self.menu.items {
             if item is DNSMenuItem {
-                item.state = 0
+                item.state = NSControl.StateValue(rawValue: 0)
                 let setting = (item as! DNSMenuItem).setting
-                if setting.servers! == servers {
-                    item.state = 1
+                if setting?.servers! == servers {
+                    item.state = NSControl.StateValue(rawValue: 1)
                 }
             }
         }
     }
 
-    func setDNSServers(item: DNSMenuItem) {
+    @objc func setDNSServers(_ item: DNSMenuItem) {
         // Check if we have a load command to run
         if let loadCmd = item.setting.loadCmd {
-            let command: [String] = loadCmd.componentsSeparatedByString(" ")
-            let (result, output) = runCommand(command)
+            let command: [String] = (loadCmd as NSString).components(separatedBy: " ")
+            let (result, output) = runCommand(args: command)
             if result != 0 {
-                self.showAlert("Error", message: "Load command failed with exit code \(result): \(output)", style: NSAlertStyle.CriticalAlertStyle)
+                self.showAlert(title: "Error", message: "Load command failed with exit code \(result): \(output)", style: NSAlert.Style.critical)
                 return
             }
         }
 
         // Change the DNS settings
         let command: [String] = [ "networksetup", "-setdnsservers", self.config!.interface! ] + item.setting.servers!
-        let (result, output) = runCommand(command)
+        let (result, output) = runCommand(args: command)
         if result != 0 {
-            self.showAlert("Error", message: "DNS change failed with exit code \(result): \(output)", style: NSAlertStyle.CriticalAlertStyle)
+            self.showAlert(title: "Error", message: "DNS change failed with exit code \(result): \(output)", style: NSAlert.Style.critical)
         }
         else {
-            self.showAlert("DNS Changed", message: "Your DNS settings have been updated successfully.", style: NSAlertStyle.WarningAlertStyle)
+        //  self.showAlert(title: "DNS Changed", message: "Your DNS settings have been updated successfully.", style: NSAlert.Style.warning)
         }
     }
 
@@ -174,7 +174,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         self.clearServers()
 
         // Add the new list of servers to the menu
-        for setting in self.config!.settings!.reverse() {
+        let settings = self.config!.settings!
+        for i in 0...settings.count-1 {
+            let setting = settings[settings.count-i-1]
 
             // Add the name of the DNS server as the menu title
             let item = DNSMenuItem(title: setting.name!, action: nil, keyEquivalent: "")
@@ -184,21 +186,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let submenu = NSMenu()
 
             // Add a load button
-            let loadItem = DNSMenuItem(title: "Load", action: #selector(AppDelegate.setDNSServers(_:)), keyEquivalent: "")
+            let loadItem = DNSMenuItem(title: "Load", action: #selector(self.setDNSServers(_:)), keyEquivalent: "")
             loadItem.setting = setting
             submenu.addItem(loadItem)
 
             // Add a separator
-            submenu.addItem(NSMenuItem.separatorItem())
+            submenu.addItem(NSMenuItem.separator())
 
             // Add the list of servers
             let serverTitleItem = NSMenuItem(title: "Servers:", action: nil, keyEquivalent: "")
-            serverTitleItem.enabled = false
+            serverTitleItem.isEnabled = false
             submenu.addItem(serverTitleItem)
             for server in setting.servers! {
                 let item = NSMenuItem(title: server, action: nil, keyEquivalent: "")
                 item.indentationLevel = 1
-                item.enabled = false
+                item.isEnabled = false
                 submenu.addItem(item)
             }
 
@@ -206,18 +208,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             item.submenu = submenu
 
             // Add the menu item to the top of the menu
-            self.menu.insertItem(item, atIndex: 0)
+            self.menu.insertItem(item, at: 0)
         }
 
         /* Highlight the enabled interface */
         self.highlightEnabledInterface()
 
-        /* Fetch the current DNS settings and highlight the
-         * selected setting in the menu if appropriate */
+        /* Fetch the current DNS settings and highlight the selected setting in the menu if appropriate */
         self.highlightCurrentDNSServers()
     }
 
-    func menuWillOpen(menu: NSMenu) {
+    func menuWillOpen(_ menu: NSMenu) {
         /* Only initialise the menu if the configuration has changed */
         if !self.checkForConfigUpdate() {
             /* In case the DNS servers have been changed, highlight the selected ones now */
@@ -234,10 +235,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func createDefaultConfigFile() {
         // If the file doesn't exist, create it using the default
-        if !NSFileManager.defaultManager().fileExistsAtPath(self.configFilePath) {
-            let defaultFilePath = NSBundle.mainBundle().pathForResource("dnsswitcher.default", ofType: "json")
+        if !FileManager.default.fileExists(atPath: self.configFilePath) {
+            let defaultFilePath = Bundle.main.path(forResource: "dnsswitcher.default", ofType: "json")
             do {
-                try NSFileManager.defaultManager().copyItemAtPath(defaultFilePath!, toPath: self.configFilePath)
+                try FileManager.default.copyItem(atPath: defaultFilePath!, toPath: self.configFilePath)
             }
             catch {
                 print("Critical error: failed to create default config file")
@@ -245,15 +246,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         }
         // Else copy the contents of the default to the existing file
-        let defaultFilePath = NSBundle.mainBundle().pathForResource("dnsswitcher.default", ofType: "json")
+        let defaultFilePath = Bundle.main.path(forResource: "dnsswitcher.default", ofType: "json")
         let data = NSData(contentsOfFile: defaultFilePath!)
-        data?.writeToFile(self.configFilePath, atomically: true)
+        data?.write(toFile: self.configFilePath, atomically: true)
     }
 
     func saveLatestConfig() {
         if let data = self.config?.export() {
             do {
-                try data.writeToFile(self.configFilePath, atomically: true, encoding: NSUTF8StringEncoding)
+                try data.write(toFile: self.configFilePath, atomically: true, encoding: String.Encoding.utf8)
             }
             catch {
                 print("Error saving configuration file")
@@ -263,15 +264,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func checkForConfigUpdate() -> Bool {
         // Check when the configuration file was last modified
-        var configFileAttributes: [String: AnyObject]?
+        var configFileAttributes: [FileAttributeKey: Any]?
         do {
-            configFileAttributes = try NSFileManager.defaultManager().attributesOfItemAtPath(self.configFilePath)
+            configFileAttributes = try FileManager.default.attributesOfItem(atPath: self.configFilePath)
         }
         catch _ {
             // Failover - reload the configuration file
             return true
         }
-        guard let lastModification = configFileAttributes?[NSFileModificationDate] as? NSDate else {
+        guard let lastModification = configFileAttributes?[FileAttributeKey(rawValue: FileAttributeKey.modificationDate.rawValue)] as? NSDate else {
             // Failover - reload the configuration file
             return true
         }
@@ -283,7 +284,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         // Compare the modification dates
-        let updateNeeded = (lastModification.compare(self.lastConfigFileUpdate!) == NSComparisonResult.OrderedDescending)
+        let updateNeeded = (lastModification.compare(self.lastConfigFileUpdate! as Date) == ComparisonResult.orderedDescending)
         self.lastConfigFileUpdate = lastModification
         return updateNeeded
     }
@@ -291,48 +292,50 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     // MARK: - Actions
 
-    @IBAction func editServers(sender: AnyObject) {
-        NSWorkspace.sharedWorkspace().openFile(self.configFilePath)
+    @IBAction func editServers(_ sender: AnyObject) {
+    //    NSWorkspace.shared.openFile(self.configFilePath)
+        let url = URL(fileURLWithPath: self.configFilePath)
+        NSWorkspace.shared.open(url)
     }
 
-    @IBAction func restoreDefaultServers(sender: AnyObject) {
+    @IBAction func restoreDefaultServers(_ sender: AnyObject) {
         self.createDefaultConfigFile()
         self.initMenu()
     }
 
-    @IBAction func about(sender: AnyObject) {
-        if let url = NSBundle.mainBundle().infoDictionary!["Product Homepage"] as? String {
-            NSWorkspace.sharedWorkspace().openURL(NSURL(string: url)!)
+    @IBAction func about(_ sender: AnyObject) {
+        if let url = Bundle.main.infoDictionary!["Product Homepage"] as? String {
+            NSWorkspace.shared.open(NSURL(string: url)! as URL)
         }
     }
 
-    @IBAction func quit(sender: AnyObject?) {
-        NSStatusBar.systemStatusBar().removeStatusItem(statusItem)
+    @IBAction func quit(_ sender: AnyObject?) {
+        NSStatusBar.system.removeStatusItem(statusItem)
         NSApp.terminate(self)
     }
 
 
     // MARK: - Helpers
 
-    func showAlert(title: String, message: String, style: NSAlertStyle) {
+    func showAlert(title: String, message: String, style: NSAlert.Style) {
         let alert = NSAlert()
         alert.messageText = title
         alert.informativeText = message
         alert.alertStyle = style
-        alert.addButtonWithTitle("OK")
+        alert.addButton(withTitle: "Ok")
         alert.runModal()
     }
 
     func runCommand(args: [String]) -> (result: Int32, output: String) {
-        let task = NSTask()
+        let task = Process()
         task.launchPath = "/usr/bin/env"
         task.arguments = args
-        let pipe = NSPipe()
+        let pipe = Pipe()
         task.standardOutput = pipe
         task.launch()
         task.waitUntilExit()
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        let output: String = NSString(data: data, encoding: NSUTF8StringEncoding) as! String
+        let output: String = NSString(data: data, encoding: String.Encoding.utf8.rawValue)! as String
         return (task.terminationStatus, output)
     }
 

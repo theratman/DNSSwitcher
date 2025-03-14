@@ -16,7 +16,7 @@ class Config {
 
     init(data: NSData) {
         self.settings = []
-        let json = JSON(data: data)
+        let json = try! JSON(data: data as Data)
 
         if let interface = json["interface"].string {
             self.interface = interface
@@ -35,7 +35,7 @@ class Config {
         for setting in settings {
             let settingItem = SettingItem(json: setting)
             if settingItem.name == nil || settingItem.servers == nil {
-                print("Error parsing server item: \(settingItem.name)")
+                print("Error parsing server item: \(String(describing: settingItem.name))")
                 continue
             }
             self.settings?.append(settingItem)
@@ -47,11 +47,11 @@ class Config {
 extension Config {
 
     func export() -> String? {
-        var settings: [[String: AnyObject]] = []
+        var settings: [[String: Any]] = []
         for setting in self.settings! {
             settings.append(setting.export())
         }
-        let data: [String: AnyObject] = [
+        let data: [String: Any] = [
             "interface": self.interface!,
             "settings": settings
         ]
