@@ -5,6 +5,7 @@ Quickly change your DNS settings in macOS (by Matt McNeeney).
 
 # Installation
 - Uncompress the file [DNSSwitcher.zip](DNSSwitcher.zip) and copy ```DNSSwitcher.app``` to ```Applications``` folder.
+- Run in a terminal ```xattr -dr com.apple.quarantine "/Applications/DNSSwitcher.app"``` to allow unidentified app.
 - Add ```DNSSwitcher.app``` to ```Open at Login``` (System Settings -> General ->  Login Items & Extensions -> Open at Login) to run automatically.
 
 # Changelog
